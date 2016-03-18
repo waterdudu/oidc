@@ -4,15 +4,39 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"github.com/coreos/go-oidc/jose"
+	"github.com/coreos/go-oidc/oauth2"
 	"github.com/coreos/go-oidc/oidc"
+
 	"log"
 	"net/http"
 	"time"
-
 	// phttp "github.com/coreos/dex/pkg/http"
 )
 
-func NewOidcClient(clientID, clientSecret, discovery, redirectURL string) (*oidc.Client, error) {
+type OidcClient struct {
+	client *oidc.Client
+}
+
+// ExchangeAuthCode exchanges an OAuth2 auth code for an OIDC JWT ID token.
+func (oc *OidcClient) ExchangeAuthCodeTokenResponse(code string) (jose.JWT, oauth2.TokenResponse, error) {
+
+	oac, err := oc.client.OAuthClient()
+	if err != nil {
+		return jose.JWT{}, oauth2.TokenResponse{}, err
+	}
+	t, err := oac.RequestToken(oauth2.GrantTypeAuthCode, code)
+	if err != nil {
+		return jose.JWT{}, oauth2.TokenResponse{}, err
+	}
+	jwt, err := jose.ParseJWT(t.IDToken)
+	if err != nil {
+		return jose.JWT{}, oauth2.TokenResponse{}, err
+	}
+	return jwt, t, oc.client.VerifyJWT(jwt)
+}
+
+func NewOidcClient(clientID, clientSecret, discovery, redirectURL string) (*OidcClient, error) {
 
 	cc := oidc.ClientCredentials{
 		ID:     clientID,
@@ -36,6 +60,7 @@ func NewOidcClient(clientID, clientSecret, discovery, redirectURL string) (*oidc
 	var err error
 	var count int = 1
 	for {
+
 		cfg, err = oidc.FetchProviderConfig(httpClient, discovery)
 		if err == nil {
 			break
@@ -46,7 +71,7 @@ func NewOidcClient(clientID, clientSecret, discovery, redirectURL string) (*oidc
 		time.Sleep(sleep)
 		count++
 		if count == 3 {
-			return &oidc.Client{}, errors.New("discovery timeout error")
+			return &OidcClient{}, errors.New("discovery timeout error")
 		}
 	}
 
@@ -65,10 +90,14 @@ func NewOidcClient(clientID, clientSecret, discovery, redirectURL string) (*oidc
 	client, err := oidc.NewClient(ccfg)
 	if err != nil {
 		fmt.Printf("Unable to create Client: %v", err)
-		return &oidc.Client{}, err
+		return &OidcClient{}, err
 	}
 
 	client.SyncProviderConfig(discovery)
 
-	return client, nil
+	oc := &OidcClient{
+		client: client,
+	}
+
+	return oc, nil
 }
