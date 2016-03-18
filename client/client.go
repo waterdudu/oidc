@@ -15,13 +15,13 @@ import (
 )
 
 type OidcClient struct {
-	client *oidc.Client
+	Client *oidc.Client
 }
 
 // ExchangeAuthCode exchanges an OAuth2 auth code for an OIDC JWT ID token.
 func (oc *OidcClient) ExchangeAuthCodeTokenResponse(code string) (jose.JWT, oauth2.TokenResponse, error) {
 
-	oac, err := oc.client.OAuthClient()
+	oac, err := oc.Client.OAuthClient()
 	if err != nil {
 		return jose.JWT{}, oauth2.TokenResponse{}, err
 	}
@@ -33,7 +33,7 @@ func (oc *OidcClient) ExchangeAuthCodeTokenResponse(code string) (jose.JWT, oaut
 	if err != nil {
 		return jose.JWT{}, oauth2.TokenResponse{}, err
 	}
-	return jwt, t, oc.client.VerifyJWT(jwt)
+	return jwt, t, oc.Client.VerifyJWT(jwt)
 }
 
 func NewOidcClient(clientID, clientSecret, discovery, redirectURL string) (*OidcClient, error) {
@@ -96,7 +96,7 @@ func NewOidcClient(clientID, clientSecret, discovery, redirectURL string) (*Oidc
 	client.SyncProviderConfig(discovery)
 
 	oc := &OidcClient{
-		client: client,
+		Client: client,
 	}
 
 	return oc, nil
